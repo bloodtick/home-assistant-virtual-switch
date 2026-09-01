@@ -12,8 +12,12 @@ from homeassistant.helpers.entity_platform import (
     AddConfigEntryEntitiesCallback,
 )
 from homeassistant.helpers.event import (
+    TrackTemplate,
+    TrackTemplateResult,
     async_track_state_change_event,
+    async_track_template_result,
 )
+from homeassistant.helpers.template import Template
 
 from .const import (
     DOMAIN,
@@ -91,13 +95,16 @@ class VirtualSwitch(SwitchEntity):
             {},
         )
 
-        self._on_icon = config[
+        self._on_icon: Template = config[
             CONF_ON_ICON
         ]
 
-        self._off_icon = config[
+        self._off_icon: Template = config[
             CONF_OFF_ICON
         ]
+
+        self._on_icon.hass = hass
+        self._off_icon.hass = hass
 
         self._attr_name = config[
             CONF_NAME
@@ -143,14 +150,27 @@ class VirtualSwitch(SwitchEntity):
         )
 
     @property
-    def icon(self) -> str:
+    def icon(self) -> str | None:
         """Return dynamic icon."""
 
-        return (
+        template = (
             self._on_icon
             if self.is_on
             else self._off_icon
         )
+
+        try:
+            result = template.async_render(
+                parse_result=False
+            )
+
+            if result is None:
+                return None
+
+            return str(result).strip()
+
+        except Exception:
+            return None
 
     @property
     def extra_state_attributes(
@@ -253,8 +273,13 @@ class VirtualSwitch(SwitchEntity):
     async def async_added_to_hass(
         self,
     ) -> None:
-        """Subscribe to source changes."""
+        """Subscribe to source and template changes."""
 
+        await super().async_added_to_hass()
+
+        #
+        # Track normal source entities.
+        #
         tracked_entities = {
             self._state_entity,
             self._command_entity,
@@ -284,3 +309,34 @@ class VirtualSwitch(SwitchEntity):
                 _source_changed,
             )
         )
+
+        #
+        # Track entities referenced by the icon templates.
+        #
+        @callback
+        def _template_changed(
+            event,
+            updates: list[TrackTemplateResult],
+        ) -> None:
+            self.async_write_ha_state()
+
+        template_tracker = async_track_template_result(
+            self._hass,
+            [
+                TrackTemplate(
+                    self._on_icon,
+                    None,
+                ),
+                TrackTemplate(
+                    self._off_icon,
+                    None,
+                ),
+            ],
+            _template_changed,
+        )
+
+        self.async_on_remove(
+            template_tracker.async_remove
+        )
+
+        template_tracker.async_refresh()
