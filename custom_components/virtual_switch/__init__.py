@@ -69,12 +69,12 @@ SWITCH_SCHEMA = vol.Schema(
         vol.Optional(
             CONF_ON_ICON,
             default="mdi:toggle-switch"
-        ): cv.icon,
+        ): cv.template,
 
         vol.Optional(
             CONF_OFF_ICON,
             default="mdi:toggle-switch-off"
-        ): cv.icon,
+        ): cv.template,
 
         vol.Optional(
             CONF_ATTRIBUTES,
