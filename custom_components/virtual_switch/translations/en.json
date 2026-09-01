@@ -1,0 +1,14 @@
+{
+  "title": "Virtual Switch",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Virtual Switch",
+        "description": "Enable Virtual Switch. Individual virtual switches are configured in YAML."
+      }
+    },
+    "abort": {
+      "already_configured": "Virtual Switch is already configured."
+    }
+  }
+}
