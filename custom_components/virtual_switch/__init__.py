@@ -24,12 +24,16 @@ from .const import (
     CONF_ATTRIBUTE,
     CONF_COPY_UNIT,
     CONF_UNIT_ATTRIBUTE,
+    CONF_VALUE_TEMPLATE,
+    CONF_UNIT,
 )
 
 
 ATTRIBUTE_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_ENTITY): cv.entity_id,
+        vol.Required(
+            CONF_ENTITY
+        ): cv.entity_id,
 
         vol.Optional(
             CONF_ATTRIBUTE
@@ -43,6 +47,14 @@ ATTRIBUTE_SCHEMA = vol.Schema(
         vol.Optional(
             CONF_UNIT_ATTRIBUTE,
             default="unit_of_measurement"
+        ): cv.string,
+
+        vol.Optional(
+            CONF_VALUE_TEMPLATE
+        ): cv.template,
+
+        vol.Optional(
+            CONF_UNIT
         ): cv.string,
     }
 )
