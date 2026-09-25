@@ -22,6 +22,5 @@ CONF_ATTRIBUTE = "attribute"
 CONF_COPY_UNIT = "copy_unit"
 CONF_UNIT_ATTRIBUTE = "unit_attribute"
 
-# Optional attribute transformation
 CONF_VALUE_TEMPLATE = "value_template"
 CONF_UNIT = "unit"
