@@ -8,9 +8,7 @@ from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device import async_entity_id_to_device
-from homeassistant.helpers.entity_platform import (
-    AddConfigEntryEntitiesCallback,
-)
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.event import (
     TrackTemplate,
     TrackTemplateResult,
@@ -20,21 +18,21 @@ from homeassistant.helpers.event import (
 from homeassistant.helpers.template import Template
 
 from .const import (
-    DOMAIN,
-    CONF_SWITCHES,
-    CONF_NAME,
-    CONF_UNIQUE_ID,
-    CONF_STATE_ENTITY,
-    CONF_COMMAND_ENTITY,
-    CONF_ON_ICON,
-    CONF_OFF_ICON,
-    CONF_ATTRIBUTES,
-    CONF_ENTITY,
     CONF_ATTRIBUTE,
+    CONF_ATTRIBUTES,
+    CONF_COMMAND_ENTITY,
     CONF_COPY_UNIT,
+    CONF_ENTITY,
+    CONF_NAME,
+    CONF_OFF_ICON,
+    CONF_ON_ICON,
+    CONF_STATE_ENTITY,
+    CONF_SWITCHES,
+    CONF_UNIQUE_ID,
+    CONF_UNIT,
     CONF_UNIT_ATTRIBUTE,
     CONF_VALUE_TEMPLATE,
-    CONF_UNIT,
+    DOMAIN,
 )
 
 
@@ -57,13 +55,10 @@ async def async_setup_entry(
             switch_id=switch_id,
             config=switch_config,
         )
-        for switch_id, switch_config
-        in switches.items()
+        for switch_id, switch_config in switches.items()
     ]
 
-    async_add_entities(
-        entities
-    )
+    async_add_entities(entities)
 
 
 class VirtualSwitch(SwitchEntity):
@@ -83,9 +78,7 @@ class VirtualSwitch(SwitchEntity):
         self._hass = hass
         self._switch_id = switch_id
 
-        self._state_entity = config[
-            CONF_STATE_ENTITY
-        ]
+        self._state_entity = config[CONF_STATE_ENTITY]
 
         self._command_entity = config.get(
             CONF_COMMAND_ENTITY,
@@ -97,24 +90,14 @@ class VirtualSwitch(SwitchEntity):
             {},
         )
 
-        self._on_icon: Template = config[
-            CONF_ON_ICON
-        ]
-
-        self._off_icon: Template = config[
-            CONF_OFF_ICON
-        ]
+        self._on_icon: Template = config[CONF_ON_ICON]
+        self._off_icon: Template = config[CONF_OFF_ICON]
 
         self._on_icon.hass = hass
         self._off_icon.hass = hass
 
-        #
-        # Attach Home Assistant to any configured
-        # attribute value templates.
-        #
-        for attribute_config in (
-            self._attributes_config.values()
-        ):
+        # Attach Home Assistant to configured value templates.
+        for attribute_config in self._attributes_config.values():
             value_template = attribute_config.get(
                 CONF_VALUE_TEMPLATE
             )
@@ -122,18 +105,11 @@ class VirtualSwitch(SwitchEntity):
             if value_template is not None:
                 value_template.hass = hass
 
-        self._attr_name = config[
-            CONF_NAME
-        ]
+        self._attr_name = config[CONF_NAME]
+        self._attr_unique_id = config[CONF_UNIQUE_ID]
 
-        self._attr_unique_id = config[
-            CONF_UNIQUE_ID
-        ]
-
-        #
-        # Link this helper entity to the existing
-        # device that owns state_entity.
-        #
+        # Link this helper entity to the existing device
+        # that owns state_entity.
         self.device_entry = async_entity_id_to_device(
             hass,
             self._state_entity,
@@ -205,30 +181,18 @@ class VirtualSwitch(SwitchEntity):
                 CONF_ENTITY
             ]
 
-            source_attribute = (
-                attribute_config.get(
-                    CONF_ATTRIBUTE
-                )
+            source_attribute = attribute_config.get(
+                CONF_ATTRIBUTE
             )
 
-            source_state = (
-                self._hass.states.get(
-                    source_entity
-                )
+            source_state = self._hass.states.get(
+                source_entity
             )
 
-            #
             # Source entity does not exist.
-            #
             if source_state is None:
-                result[
-                    output_name
-                ] = None
+                result[output_name] = None
 
-                #
-                # Preserve explicit unit even if
-                # the source entity is unavailable.
-                #
                 explicit_unit = attribute_config.get(
                     CONF_UNIT
                 )
@@ -240,13 +204,7 @@ class VirtualSwitch(SwitchEntity):
 
                 continue
 
-            #
             # Determine the raw source value.
-            #
-            # If "attribute" is configured, use
-            # that attribute. Otherwise use the
-            # entity state.
-            #
             if source_attribute:
                 source_value = (
                     source_state.attributes.get(
@@ -256,9 +214,7 @@ class VirtualSwitch(SwitchEntity):
             else:
                 source_value = source_state.state
 
-            #
             # Apply optional value_template.
-            #
             value_template = attribute_config.get(
                 CONF_VALUE_TEMPLATE
             )
@@ -281,10 +237,8 @@ class VirtualSwitch(SwitchEntity):
                     ] = rendered_value
 
                 except Exception:
-                    #
-                    # A template failure should not
-                    # break the entire virtual switch.
-                    #
+                    # A template failure should not break
+                    # the entire virtual switch.
                     result[
                         output_name
                     ] = None
@@ -294,12 +248,9 @@ class VirtualSwitch(SwitchEntity):
                     output_name
                 ] = source_value
 
-            #
             # Unit handling.
             #
-            # Explicit "unit" takes precedence over
-            # copy_unit.
-            #
+            # Explicit unit takes precedence over copy_unit.
             explicit_unit = attribute_config.get(
                 CONF_UNIT
             )
@@ -312,11 +263,9 @@ class VirtualSwitch(SwitchEntity):
             elif attribute_config.get(
                 CONF_COPY_UNIT
             ):
-                unit_attribute = (
-                    attribute_config.get(
-                        CONF_UNIT_ATTRIBUTE,
-                        "unit_of_measurement",
-                    )
+                unit_attribute = attribute_config.get(
+                    CONF_UNIT_ATTRIBUTE,
+                    "unit_of_measurement",
                 )
 
                 result[
@@ -337,8 +286,7 @@ class VirtualSwitch(SwitchEntity):
             "homeassistant",
             "turn_on",
             {
-                "entity_id":
-                    self._command_entity
+                "entity_id": self._command_entity
             },
             blocking=True,
         )
@@ -353,8 +301,7 @@ class VirtualSwitch(SwitchEntity):
             "homeassistant",
             "turn_off",
             {
-                "entity_id":
-                    self._command_entity
+                "entity_id": self._command_entity
             },
             blocking=True,
         )
@@ -362,13 +309,11 @@ class VirtualSwitch(SwitchEntity):
     async def async_added_to_hass(
         self,
     ) -> None:
-        """Subscribe to source and template changes."""
+        """Subscribe to source and icon template changes."""
 
         await super().async_added_to_hass()
 
-        #
-        # Track normal source entities.
-        #
+        # Track state, command, and attribute source entities.
         tracked_entities = {
             self._state_entity,
             self._command_entity,
@@ -378,9 +323,7 @@ class VirtualSwitch(SwitchEntity):
             self._attributes_config.values()
         ):
             tracked_entities.add(
-                attribute_config[
-                    CONF_ENTITY
-                ]
+                attribute_config[CONF_ENTITY]
             )
 
         @callback
@@ -392,17 +335,19 @@ class VirtualSwitch(SwitchEntity):
         self.async_on_remove(
             async_track_state_change_event(
                 self._hass,
-                list(
-                    tracked_entities
-                ),
+                list(tracked_entities),
                 _source_changed,
             )
         )
 
+        # Track icon templates.
         #
-        # Track entities referenced by the icon
-        # templates and attribute value templates.
-        #
+        # Attribute value templates are intentionally
+        # not registered here because they use custom
+        # variables (value, entity, state). The generic
+        # Home Assistant template tracker evaluates
+        # templates without those variables, which
+        # causes "value is undefined" errors.
         tracked_templates = [
             TrackTemplate(
                 self._on_icon,
@@ -413,21 +358,6 @@ class VirtualSwitch(SwitchEntity):
                 None,
             ),
         ]
-
-        for attribute_config in (
-            self._attributes_config.values()
-        ):
-            value_template = attribute_config.get(
-                CONF_VALUE_TEMPLATE
-            )
-
-            if value_template is not None:
-                tracked_templates.append(
-                    TrackTemplate(
-                        value_template,
-                        None,
-                    )
-                )
 
         @callback
         def _template_changed(
