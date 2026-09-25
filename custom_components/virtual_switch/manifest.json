@@ -4,8 +4,8 @@
   "version": "1.0.1",
   "config_flow": true,
   "single_config_entry": true,
-  "integration_type": "service",
-  "iot_class": "local_push",
+  "integration_type": "helper",
+  "iot_class": "calculated",
   "documentation": "https://github.com/bloodtick/home-assistant-virtual-switch",
   "issue_tracker": "https://github.com/bloodtick/home-assistant-virtual-switch/issues",
   "codeowners": [
