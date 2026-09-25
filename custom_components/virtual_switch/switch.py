@@ -33,6 +33,8 @@ from .const import (
     CONF_ATTRIBUTE,
     CONF_COPY_UNIT,
     CONF_UNIT_ATTRIBUTE,
+    CONF_VALUE_TEMPLATE,
+    CONF_UNIT,
 )
 
 
@@ -105,6 +107,20 @@ class VirtualSwitch(SwitchEntity):
 
         self._on_icon.hass = hass
         self._off_icon.hass = hass
+
+        #
+        # Attach Home Assistant to any configured
+        # attribute value templates.
+        #
+        for attribute_config in (
+            self._attributes_config.values()
+        ):
+            value_template = attribute_config.get(
+                CONF_VALUE_TEMPLATE
+            )
+
+            if value_template is not None:
+                value_template.hass = hass
 
         self._attr_name = config[
             CONF_NAME
@@ -201,26 +217,99 @@ class VirtualSwitch(SwitchEntity):
                 )
             )
 
+            #
+            # Source entity does not exist.
+            #
             if source_state is None:
                 result[
                     output_name
                 ] = None
 
+                #
+                # Preserve explicit unit even if
+                # the source entity is unavailable.
+                #
+                explicit_unit = attribute_config.get(
+                    CONF_UNIT
+                )
+
+                if explicit_unit is not None:
+                    result[
+                        f"{output_name}_unit"
+                    ] = explicit_unit
+
                 continue
 
+            #
+            # Determine the raw source value.
+            #
+            # If "attribute" is configured, use
+            # that attribute. Otherwise use the
+            # entity state.
+            #
             if source_attribute:
-                result[
-                    output_name
-                ] = source_state.attributes.get(
-                    source_attribute
+                source_value = (
+                    source_state.attributes.get(
+                        source_attribute
+                    )
                 )
+            else:
+                source_value = source_state.state
+
+            #
+            # Apply optional value_template.
+            #
+            value_template = attribute_config.get(
+                CONF_VALUE_TEMPLATE
+            )
+
+            if value_template is not None:
+                try:
+                    rendered_value = (
+                        value_template.async_render(
+                            variables={
+                                "value": source_value,
+                                "entity": source_entity,
+                                "state": source_state,
+                            },
+                            parse_result=True,
+                        )
+                    )
+
+                    result[
+                        output_name
+                    ] = rendered_value
+
+                except Exception:
+                    #
+                    # A template failure should not
+                    # break the entire virtual switch.
+                    #
+                    result[
+                        output_name
+                    ] = None
 
             else:
                 result[
                     output_name
-                ] = source_state.state
+                ] = source_value
 
-            if attribute_config.get(
+            #
+            # Unit handling.
+            #
+            # Explicit "unit" takes precedence over
+            # copy_unit.
+            #
+            explicit_unit = attribute_config.get(
+                CONF_UNIT
+            )
+
+            if explicit_unit is not None:
+                result[
+                    f"{output_name}_unit"
+                ] = explicit_unit
+
+            elif attribute_config.get(
                 CONF_COPY_UNIT
             ):
                 unit_attribute = (
@@ -311,8 +400,35 @@ class VirtualSwitch(SwitchEntity):
         )
 
         #
-        # Track entities referenced by the icon templates.
+        # Track entities referenced by the icon
+        # templates and attribute value templates.
         #
+        tracked_templates = [
+            TrackTemplate(
+                self._on_icon,
+                None,
+            ),
+            TrackTemplate(
+                self._off_icon,
+                None,
+            ),
+        ]
+
+        for attribute_config in (
+            self._attributes_config.values()
+        ):
+            value_template = attribute_config.get(
+                CONF_VALUE_TEMPLATE
+            )
+
+            if value_template is not None:
+                tracked_templates.append(
+                    TrackTemplate(
+                        value_template,
+                        None,
+                    )
+                )
+
         @callback
         def _template_changed(
             event,
@@ -322,16 +438,7 @@ class VirtualSwitch(SwitchEntity):
 
         template_tracker = async_track_template_result(
             self._hass,
-            [
-                TrackTemplate(
-                    self._on_icon,
-                    None,
-                ),
-                TrackTemplate(
-                    self._off_icon,
-                    None,
-                ),
-            ],
+            tracked_templates,
             _template_changed,
         )
 
