@@ -1,10 +1,10 @@
 # Virtual Switch for Home Assistant
 
-Virtual Switch is a custom Home Assistant integration that creates virtual
-switch entities backed by existing Home Assistant entities.
+Virtual Switch is a custom Home Assistant helper that creates virtual switch entities backed by existing Home Assistant entities.
 
-It is useful when you want a simplified switch while preserving the source
-entity's state, commands, device relationship, and selected attributes.
+It is useful when you want to combine the state, control, and attributes of existing Home Assistant entities into a single logical switch.
+
+For example, a virtual switch can use one entity for its on/off state, another for commands, and expose power, voltage, battery level, runtime, or other entity data as attributes.
 
 ## Features
 
@@ -13,21 +13,20 @@ entity's state, commands, device relationship, and selected attributes.
 - Sends on/off commands to a configurable entity
 - Supports separate state and command entities
 - Supports different on/off icons
-- Copies states from other entities as attributes
+- Exposes states from other entities as attributes
 - Copies specific attributes from other entities
-- Can copy units of measurement
-- Supports explicit units for attributes
 - Supports Home Assistant templates for transforming attribute values
-- Updates when source entities change
-- Updates when entities referenced by templates change
+- Supports explicit units of measurement
+- Can automatically copy units of measurement from source entities
+- Updates when source entities or template dependencies change
 - Does not poll
-- Links the virtual switch to the source entity's existing HA device
+- Links the virtual switch to the source entity's existing Home Assistant device
 - Supports multiple virtual switches
 
 ## Installation with HACS
 
 1. Open HACS.
-2. Go to **Integrations**.
+2. Go to Integrations.
 3. Add a custom repository.
 4. Use this repository:
 
@@ -41,7 +40,7 @@ entity's state, commands, device relationship, and selected attributes.
 
 Virtual switch definitions are configured in YAML.
 
-## Example Configuration
+## Basic Configuration
 
 ```yaml
 virtual_switch:
@@ -72,7 +71,7 @@ This creates a virtual switch whose state follows:
 switch.master_bedroom_fan
 ```
 
-Turning the virtual switch on or off sends the same command to:
+Turning the virtual switch on or off sends the command to:
 
 ```text
 switch.master_bedroom_fan
@@ -87,9 +86,9 @@ voltage: 121
 voltage_unit: V
 ```
 
-## Options
+## Configuration Options
 
-### name
+### `name`
 
 Friendly name for the virtual switch.
 
@@ -97,15 +96,15 @@ Friendly name for the virtual switch.
 name: "Master Bedroom Switch Fan"
 ```
 
-### unique_id
+### `unique_id`
 
-Unique Home Assistant identifier.
+Unique Home Assistant identifier for the virtual switch.
 
 ```yaml
 unique_id: master_bedroom_switch_fan
 ```
 
-### state_entity
+### `state_entity`
 
 Entity used to determine whether the virtual switch is on or off.
 
@@ -113,12 +112,11 @@ Entity used to determine whether the virtual switch is on or off.
 state_entity: switch.master_bedroom_fan
 ```
 
-The virtual switch is also associated with the Home Assistant device belonging
-to this entity.
+The virtual switch is also associated with the Home Assistant device belonging to this entity when a device is available.
 
-### command_entity
+### `command_entity`
 
-Entity that receives on and off commands.
+Entity that receives the on and off commands.
 
 ```yaml
 command_entity: switch.master_bedroom_fan
@@ -128,21 +126,18 @@ If omitted, `state_entity` is used.
 
 ### Icons
 
-Different icons can be used for the on and off states.
+Different icons can be displayed for the on and off states.
 
 ```yaml
 on_icon: mdi:fan
 off_icon: mdi:fan-off
 ```
 
-Home Assistant templates can also be used for icons.
-
 ## Attributes
 
-Attributes allow information from other Home Assistant entities to be exposed
-as attributes of the virtual switch.
+Virtual Switch can expose data from other Home Assistant entities as attributes of the switch.
 
-### Copy an Entity State
+### Copy an entity state
 
 ```yaml
 attributes:
@@ -150,15 +145,9 @@ attributes:
     entity: sensor.master_bedroom_fan_power
 ```
 
-This produces:
+This creates a `power` attribute using the state of the source entity.
 
-```text
-power: 13
-```
-
-### Copy the Unit of Measurement
-
-Use `copy_unit: true` to copy the source entity's unit.
+### Copy the unit of measurement
 
 ```yaml
 attributes:
@@ -167,16 +156,16 @@ attributes:
     copy_unit: true
 ```
 
-This produces:
+If the source entity reports watts, the resulting attributes could be:
 
 ```text
 power: 13
 power_unit: W
 ```
 
-### Copy a Specific Attribute
+### Copy a specific source attribute
 
-Instead of copying the entity state, a specific attribute can be copied.
+Instead of using the source entity's state, you can copy one of its attributes.
 
 ```yaml
 attributes:
@@ -185,14 +174,29 @@ attributes:
     attribute: hvac_action
 ```
 
-### Transform a Value with value_template
+## Attribute Templates
 
-Starting with version 1.0.1, attribute values can be transformed using a
-Home Assistant template.
+Attribute values can be transformed using Home Assistant templates.
 
-The source value is available inside the template as `value`.
+The source value is available inside the template as:
 
-For example, convert UPS runtime from seconds to minutes:
+```text
+value
+```
+
+The source entity ID is available as:
+
+```text
+entity
+```
+
+The complete Home Assistant State object is available as:
+
+```text
+state
+```
+
+### Example: Convert seconds to minutes
 
 ```yaml
 attributes:
@@ -203,93 +207,108 @@ attributes:
     unit: "min"
 ```
 
-If the source entity reports:
+If the source sensor reports:
 
 ```text
-2580
+3600
 ```
 
 the virtual switch will expose:
 
 ```text
-battery_runtime_min: 43.0
+battery_runtime_min: 60.0
 battery_runtime_min_unit: min
 ```
 
-### Template Variables
-
-The following variables are available inside `value_template`:
-
-| Variable | Description |
-| --- | --- |
-| `value` | State or selected attribute from the source entity |
-| `entity` | Entity ID of the source entity |
-| `state` | Full Home Assistant State object for the source entity |
-
-Normal Home Assistant template functions such as `states()` and
-`state_attr()` are also available.
-
-For example:
+### Example: Convert watts to kilowatts
 
 ```yaml
 attributes:
-  rounded_power:
+  power_kw:
+    entity: sensor.house_power
+    value_template: >
+      {{ (value | float(0) / 1000) | round(2) }}
+    unit: "kW"
+```
+
+### Example: Convert Celsius to Fahrenheit
+
+```yaml
+attributes:
+  temperature_f:
+    entity: sensor.room_temperature
+    value_template: >
+      {{ ((value | float(0)) * 9 / 5 + 32) | round(1) }}
+    unit: "°F"
+```
+
+### Example: Convert a numeric value to text
+
+```yaml
+attributes:
+  load_status:
     entity: sensor.device_power
     value_template: >
-      {{ value | float(0) | round(1) }}
-    unit: "W"
+      {% if value | float(0) > 100 %}
+        High
+      {% elif value | float(0) > 10 %}
+        Normal
+      {% else %}
+        Idle
+      {% endif %}
 ```
 
-### Explicit Unit
-
-Use `unit` to assign an explicit unit to an attribute.
+Templates can also reference other Home Assistant entities using normal Home Assistant template functions.
 
 ```yaml
 attributes:
-  runtime:
-    entity: sensor.ups_battery_runtime
+  system_status:
+    entity: sensor.device_power
     value_template: >
-      {{ (value | float(0) / 60) | round(1) }}
-    unit: "min"
+      {% if is_state('binary_sensor.system_online', 'on') %}
+        Online - {{ value }} W
+      {% else %}
+        Offline
+      {% endif %}
 ```
 
-An explicit `unit` takes precedence over `copy_unit`.
+Virtual Switch tracks entities referenced by templates so the virtual switch updates when those dependencies change.
 
-### Unit Handling
+## Units
 
-If an explicit unit is configured:
+There are two ways to add units to an attribute.
 
-```yaml
-unit: "min"
-```
-
-that unit is used.
-
-Otherwise:
+### Copy the source unit
 
 ```yaml
 copy_unit: true
 ```
 
-copies the source entity's `unit_of_measurement`.
+### Specify a unit explicitly
 
-The resulting unit is exposed as:
-
-```text
-<attribute_name>_unit
+```yaml
+unit: "min"
 ```
+
+If both are specified, the explicit `unit` value takes precedence.
 
 For example:
 
-```text
-power_unit: W
-battery_runtime_min_unit: min
+```yaml
+attributes:
+  battery_runtime_min:
+    entity: sensor.ups_battery_runtime
+    copy_unit: true
+    value_template: >
+      {{ (value | float(0) / 60) | round(1) }}
+    unit: "min"
 ```
+
+The resulting unit will be `min`, regardless of the source sensor's unit.
 
 ## UPS Example
 
-The following example creates a virtual UPS power switch with power, voltage,
-battery charge, raw battery runtime, converted battery runtime, and UPS status.
+A virtual UPS power switch can combine switch control with power and battery telemetry:
 
 ```yaml
 virtual_switch:
@@ -334,85 +353,24 @@ virtual_switch:
           entity: sensor.ups_status_data
 ```
 
-A resulting switch could expose:
+This allows one logical switch entity to provide:
 
 ```text
-power: 37
-power_unit: W
-
-voltage: 121
-voltage_unit: V
-
-battery: 100
-battery_unit: %
-
-battery_runtime: 2580
-battery_runtime_unit: s
-
-battery_runtime_min: 43.0
-battery_runtime_min_unit: min
-
-status: OL
-status_data: Online
+State
+Power
+Voltage
+Battery charge
+Battery runtime
+Battery runtime in minutes
+UPS status
+UPS status data
 ```
 
-## Other value_template Examples
-
-### Watts to Kilowatts
-
-```yaml
-attributes:
-  power_kw:
-    entity: sensor.house_power
-    value_template: >
-      {{ (value | float(0) / 1000) | round(2) }}
-    unit: "kW"
-```
-
-### Celsius to Fahrenheit
-
-```yaml
-attributes:
-  temperature_f:
-    entity: sensor.device_temperature
-    value_template: >
-      {{ ((value | float(0) * 9 / 5) + 32) | round(1) }}
-    unit: "°F"
-```
-
-### Convert a Numeric Value to Text
-
-```yaml
-attributes:
-  load_status:
-    entity: sensor.device_power
-    value_template: >
-      {% if value | float(0) > 10 %}
-        Active
-      {% else %}
-        Standby
-      {% endif %}
-```
-
-### Reference Another Home Assistant Entity
-
-Templates can also use normal Home Assistant template functions.
-
-```yaml
-attributes:
-  room_status:
-    entity: sensor.device_power
-    value_template: >
-      {% if is_state('binary_sensor.room_occupied', 'on') %}
-        Occupied
-      {% else %}
-        Empty
-      {% endif %}
-```
-
-The virtual switch will update when entities referenced by the template change.
+while still controlling the original UPS switch.
 
 ## Multiple Virtual Switches
+
+Multiple switches can be defined under the same integration.
 
 ```yaml
 virtual_switch:
@@ -430,28 +388,23 @@ virtual_switch:
 
 ## Attribute Configuration Reference
 
-Each attribute supports:
+| Option | Description |
+|---|---|
+| `entity` | Source Home Assistant entity |
+| `attribute` | Optional attribute to read instead of the entity state |
+| `copy_unit` | Copy the source entity's unit of measurement |
+| `unit` | Explicit unit to expose for the virtual attribute |
+| `value_template` | Home Assistant template used to transform the source value |
+| `unit_attribute` | Optional source attribute containing the unit |
 
-| Option | Required | Description |
-| --- | --- | --- |
-| `entity` | Yes | Source Home Assistant entity |
-| `attribute` | No | Copy a specific source attribute instead of the entity state |
-| `copy_unit` | No | Copy the source entity's unit of measurement |
-| `unit_attribute` | No | Source attribute containing the unit. Defaults to `unit_of_measurement` |
-| `value_template` | No | Home Assistant template used to transform the source value |
-| `unit` | No | Explicit unit for the resulting attribute |
+## Updating
 
-## Version 1.0.1
+When updating Virtual Switch through HACS:
 
-Added:
+1. Install or redownload the latest release.
+2. Restart Home Assistant.
 
-- `value_template` support for virtual switch attributes
-- Explicit `unit` support
-- Template variables for `value`, `entity`, and `state`
-- Tracking of entities referenced by attribute templates
-- Explicit units take precedence over `copy_unit`
-
-Existing configurations remain compatible.
+Python changes to custom integrations require a Home Assistant restart before they take effect.
 
 ## License
 
